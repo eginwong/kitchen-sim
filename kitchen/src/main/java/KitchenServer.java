@@ -1,4 +1,6 @@
 import com.eginwong.kitchensim.WaiterGrpc;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -60,9 +62,18 @@ public class KitchenServer {
 
         @Override
         public void instantOrder(MealRequest req, StreamObserver<MealResponse> responseObserver) {
+            logger.info("RECEIVED INSTANT ORDER REQUEST");
             MealResponse response = MealResponse.newBuilder().addMeals(Meal.newBuilder().setId(req.getMealIds(0))
             .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build()).build();
             responseObserver.onNext(response);
+
+            try {
+                logger.info(JsonFormat.printer().print(req));
+                logger.info("SERVED BY: " + JsonFormat.printer().print(response));
+            } catch (InvalidProtocolBufferException e) {
+                e.printStackTrace();
+            }
+
             responseObserver.onCompleted();
         }
     }
