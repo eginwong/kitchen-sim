@@ -33,3 +33,8 @@ message Meal {
   string name = 2; 
   repeated string ingredients = 3;
 }
+
+// Not used in RPC, but for bootstrapping purposes
+message MealsDatabase {
+  repeated Meal meals = 1;
+}

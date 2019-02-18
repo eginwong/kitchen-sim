@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package com.eginwong.kitchensim;
 
-// The order service definition.
+// The waiter service definition.
 service Waiter {
   // Orders meals and waits until all food is ready before sending it out of the kitchen
   rpc InstantOrder (MealRequest) returns (MealResponse) {}
@@ -32,4 +32,9 @@ message Meal {
   int32 id = 1;
   string name = 2; 
   repeated string ingredients = 3;
+}
+
+// Not used in RPC, but for bootstrapping purposes
+message MealsDatabase {
+  repeated Meal meals = 1;
 }
