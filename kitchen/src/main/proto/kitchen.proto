@@ -4,34 +4,40 @@ package com.eginwong.kitchensim;
 
 // The waiter service definition.
 service Waiter {
-  // Orders meals and waits until all food is ready before sending it out of the kitchen
-  rpc InstantOrder (MealRequest) returns (MealResponse) {}
-  
-  // Orders several meals while on tab, similar to bar where patrons add drinks throughout the meal
-  rpc OnTabOrder (stream MealRequest) returns (MealResponse) {}
+  // Orders a single meal, direct from the cook, and sends food immediately when ready
+  rpc StaffOrder (SingleOrder) returns (Meal) {}
 
-  // Orders a meal but sends back food as it becomes available
-  rpc StaggeredOrder (MealRequest) returns (stream MealResponse) {}
+  // Orders several meals, and returns all ordered meals at one time
+  rpc WesternHostOrder (stream SingleOrder) returns (BatchMeals) {}
+
+  // Orders all food for the meal at once but sends back food as it becomes available
+  rpc EasternHostOrder (MealRequest) returns (stream Meal) {}
 
   // Orders food continuously and the kitchen returns food continuously
-  rpc DimSumOrder (stream MealRequest) returns (stream MealResponse) {}
-
+  rpc DimSumOrder (stream MealRequest) returns (stream BatchMeals) {}
 }
 
-// The request message containing the user's name.
+// The request message containing the meal id.
+message SingleOrder {
+  int32 mealId = 1;
+}
+
+// The request message containing several meal ids.
 message MealRequest {
   repeated int32 mealIds = 1;
 }
 
-// The response message containing the greetings
-message MealResponse {
+// The response message containing multiple meals.
+message BatchMeals {
   repeated Meal meals = 1;
 }
 
+// The entity of work from the kitchen.
 message Meal {
   int32 id = 1;
   string name = 2; 
   repeated string ingredients = 3;
+  int32 servingTime = 4;
 }
 
 // Not used in RPC, but for bootstrapping purposes

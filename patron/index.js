@@ -1,17 +1,18 @@
-var grpc = require('grpc');
-var protoLoader = require('@grpc/proto-loader');
-var packageDefinition = protoLoader.loadSync(
+const grpc = require('grpc');
+const protoLoader = require('@grpc/proto-loader');
+const packageDefinition = protoLoader.loadSync(
   '../protos/kitchen.proto',
-    {keepCase: true,
-     longs: String,
-     enums: String,
-     defaults: true,
-     oneofs: true
-    });
-var kitchen_sim_proto = grpc.loadPackageDefinition(packageDefinition).com.eginwong.kitchensim;
+  {
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true
+  });
+const kitchen_sim_proto = grpc.loadPackageDefinition(packageDefinition).com.eginwong.kitchensim;
 
 
-var client = new kitchen_sim_proto.Waiter('127.0.0.1:50051',
+const client = new kitchen_sim_proto.Waiter('127.0.0.1:50051',
   grpc.credentials.createInsecure());
 
 function printResponse(error, response) {
@@ -21,16 +22,36 @@ function printResponse(error, response) {
     console.log(response);
 }
 
-function instant() {
-  client.instantOrder({ mealIds: [1] }, function (error, meals) {
-    printResponse(error, meals);
+function staff(id) {
+  client.staffOrder({ mealId: id }, function (error, meal) {
+    printResponse(error, meal);
   });
 }
 
-// CLI piece
-var processName = process.argv.shift();
-var scriptName = process.argv.shift();
-var command = process.argv.shift();
+function easternHostOrder(callback) {
+  console.log('Ordering meals #1, #10, #12');
+  const call = client.easternHostOrder({ mealIds: [1, 10, 12] });
 
-if (command == 'instant')
-  instant();
+  call.on('data', function (meal) {
+    console.log('Served meal: "' + meal.name + '" with ingredients:  ' +
+      meal.ingredients + ', for id: ' +
+      meal.id + ". Serving time required: " + meal.servingTime);
+  });
+  call.on('end', callback);
+}
+
+function westernHostOrder() {
+}
+
+// CLI piece
+const processName = process.argv.shift();
+const scriptName = process.argv.shift();
+const command = process.argv.shift();
+
+if (command == 'staff') {
+  staff(process.argv.shift());
+} else if (command == 'western') {
+  westernHostOrder();
+} else if (command == 'eastern') {
+  easternHostOrder(() => {});
+}

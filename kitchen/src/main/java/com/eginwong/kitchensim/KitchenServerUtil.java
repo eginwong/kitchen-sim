@@ -9,35 +9,33 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
-import static com.eginwong.kitchensim.Kitchen.*;
+import static com.eginwong.kitchensim.Kitchen.MealsDatabase;
 
 public class KitchenServerUtil {
 
     /**
      * Gets the default features file from classpath.
      */
-    public static URL getDefaultMealsFile() {
+    static URL getDefaultMealsFile() {
         return KitchenServer.class.getResource("kitchen_sim_meals_db.json");
     }
 
     /**
      * Parses the JSON input file containing the list of features.
      */
-    public static List<Meal> parseKitchenMeals(URL file) throws IOException {
-        InputStream input = file.openStream();
-        try {
-            Reader reader = new InputStreamReader(input, Charset.forName("UTF-8"));
-            try {
+    static Map<Integer, Meal> parseKitchenMeals(URL file) throws IOException {
+        try (InputStream input = file.openStream()) {
+            try (Reader reader = new InputStreamReader(input, Charset.forName("UTF-8"))) {
                 MealsDatabase.Builder database = MealsDatabase.newBuilder();
                 JsonFormat.parser().merge(reader, database);
-                return database.getMealsList();
-            } finally {
-                reader.close();
+
+                Map<Integer, Meal> map = new HashMap<>();
+                for (Meal m : database.getMealsList()) map.put(m.getId(), m);
+                return map;
             }
-        } finally {
-            input.close();
         }
     }
 }

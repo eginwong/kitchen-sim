@@ -1,3 +1,7 @@
 {
-  "meals": [{ "ingredients": [ "CHIVES" ], "id": 1, "name": "YEUNG CHOW CHOW FAN" }]
+  "meals": [
+    { "ingredients": [ "CHIVES" ], "id": 1, "name": "YEUNG CHOW CHOW FAN", "servingTime": 3000 },
+    { "ingredients": [ "BEEF" ], "id": 10, "name": "SUPERSTAR PHO", "servingTime": 5000 },
+    { "ingredients": [ "CHICKEN" ], "id": 12, "name": "PHOENIX CLAW", "servingTime": 100 }
+  ]
 }

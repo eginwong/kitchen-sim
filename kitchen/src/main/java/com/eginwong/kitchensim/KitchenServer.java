@@ -4,11 +4,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import static com.eginwong.kitchensim.Kitchen.*;
@@ -36,7 +39,7 @@ public class KitchenServer {
     /**
      * Create a Kitchen server using serverBuilder as a base and meals as data.
      */
-    public KitchenServer(ServerBuilder<?> serverBuilder, int port, Collection<Meal> meals) {
+    public KitchenServer(ServerBuilder<?> serverBuilder, int port, Map<Integer, Meal> meals) {
         this.port = port;
         server = serverBuilder.addService(new WaiterService(meals))
                 .build();
@@ -90,9 +93,9 @@ public class KitchenServer {
      * <p>See kitchen.proto for details of the methods.
      */
     private static class WaiterService extends WaiterGrpc.WaiterImplBase {
-        private final Collection<Meal> meals;
+        private final Map<Integer, Meal> meals;
 
-        WaiterService(Collection<Meal> mealsDatabase) {
+        WaiterService(Map<Integer, Meal> mealsDatabase) {
             this.meals = mealsDatabase;
         }
 
@@ -103,21 +106,52 @@ public class KitchenServer {
          * @param req              the requested meal.
          * @param responseObserver the observer that will receive the meal at the requested point.
          */
-        @Override
-        public void instantOrder(MealRequest req, StreamObserver<MealResponse> responseObserver) {
-            logger.info("RECEIVED INSTANT ORDER REQUEST");
-            MealResponse response = MealResponse.newBuilder().addMeals(Meal.newBuilder().setId(req.getMealIds(0))
-                    .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build()).build();
-            responseObserver.onNext(response);
+        public void staffOrder(SingleOrder req, StreamObserver<Meal> responseObserver) {
+            logger.info("RECEIVED STAFF ORDER REQUEST");
+            if (meals.containsKey(req.getMealId())) {
+                Meal orderedMeal = meals.get(req.getMealId());
 
-            try {
-                logger.info(JsonFormat.printer().print(req));
-                logger.info("SERVED BY: " + JsonFormat.printer().print(response));
-            } catch (InvalidProtocolBufferException e) {
-                e.printStackTrace();
+                try {
+                    TimeUnit.MILLISECONDS.sleep(orderedMeal.getServingTime());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                responseObserver.onNext(orderedMeal);
+
+                try {
+                    logger.info(JsonFormat.printer().print(req));
+                    logger.info("SERVED BY: " + JsonFormat.printer().print(orderedMeal));
+                } catch (InvalidProtocolBufferException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                responseObserver.onError(new StatusRuntimeException(Status.NOT_FOUND));
             }
 
             responseObserver.onCompleted();
         }
-    }
+
+        /**
+         * Gets all meals contained within the meal request.
+         *
+         * @param request          the ids for the requested meals.
+         * @param responseObserver the observer that will receive the meals.
+         */
+        @Override
+        public void easternHostOrder(MealRequest request, StreamObserver<Meal> responseObserver) {
+            for (Integer id : request.getMealIdsList()) {
+                if (!meals.containsKey(id)) {
+                    continue;
+                }
+                Meal orderedMeal = meals.get(id);
+
+                try {
+                    TimeUnit.MILLISECONDS.sleep(orderedMeal.getServingTime());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                responseObserver.onNext(orderedMeal);
+            }
+            responseObserver.onCompleted();
+        }
 }
