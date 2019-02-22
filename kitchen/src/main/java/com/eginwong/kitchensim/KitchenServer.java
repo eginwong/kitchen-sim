@@ -10,11 +10,16 @@ import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import static com.eginwong.kitchensim.Kitchen.*;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * Server that manages startup/shutdown of a {@code KitchenServer} server.
@@ -25,21 +30,21 @@ public class KitchenServer {
     private final int port;
     private final Server server;
 
-    public KitchenServer(int port) throws IOException {
+    private KitchenServer(int port) throws IOException {
         this(port, KitchenServerUtil.getDefaultMealsFile());
     }
 
     /**
      * Create a Kitchen server listening on {@code port} using {@code mealsFile} database.
      */
-    public KitchenServer(int port, URL mealsFile) throws IOException {
+    private KitchenServer(int port, URL mealsFile) throws IOException {
         this(ServerBuilder.forPort(port), port, KitchenServerUtil.parseKitchenMeals(mealsFile));
     }
 
     /**
      * Create a Kitchen server using serverBuilder as a base and meals as data.
      */
-    public KitchenServer(ServerBuilder<?> serverBuilder, int port, Map<Integer, Meal> meals) {
+    KitchenServer(ServerBuilder<?> serverBuilder, int port, Map<Integer, Meal> meals) {
         this.port = port;
         server = serverBuilder.addService(new WaiterService(meals))
                 .build();
@@ -48,7 +53,7 @@ public class KitchenServer {
     /**
      * Start serving requests.
      */
-    public void start() throws IOException {
+    void start() throws IOException {
         server.start();
         logger.info("Server started, listening on " + port);
 
@@ -132,26 +137,107 @@ public class KitchenServer {
         }
 
         /**
-         * Gets all meals contained within the meal request.
+         * Gets all {@link Meal}s contained within the {@link MealRequest}.
          *
          * @param request          the ids for the requested meals.
          * @param responseObserver the observer that will receive the meals.
          */
         @Override
         public void easternHostOrder(MealRequest request, StreamObserver<Meal> responseObserver) {
-            for (Integer id : request.getMealIdsList()) {
-                if (!meals.containsKey(id)) {
-                    continue;
-                }
-                Meal orderedMeal = meals.get(id);
-
-                try {
-                    TimeUnit.MILLISECONDS.sleep(orderedMeal.getServingTime());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                responseObserver.onNext(orderedMeal);
-            }
+            request.getMealIdsList().stream()
+                    .filter(meals::containsKey)
+                    .map(meals::get)
+                    .forEach(meal -> {
+                        try {
+                            TimeUnit.MILLISECONDS.sleep(meal.getServingTime());
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        responseObserver.onNext(meal);
+                    });
             responseObserver.onCompleted();
         }
+
+        /**
+         * Gets a stream of {@link SingleOrder}s, and responds with an aggregation of all meals as {@link BatchMeals}
+         * served at once from kitchen.
+         *
+         * @param responseObserver an observer to receive the response summary.
+         * @return an observer to receive the requested food orders.
+         */
+        @Override
+        public StreamObserver<SingleOrder> westernHostOrder(final StreamObserver<BatchMeals> responseObserver) {
+            return new StreamObserver<SingleOrder>() {
+                List<Meal> orderedMeals = new ArrayList<>();
+                final long startTime = System.nanoTime();
+
+                @Override
+                public void onNext(SingleOrder order) {
+                    if (meals.containsKey(order.getMealId())) {
+                        try {
+                            Meal orderedMeal = meals.get(order.getMealId());
+                            TimeUnit.MILLISECONDS.sleep(orderedMeal.getServingTime());
+                            orderedMeals.add(orderedMeal);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    logger.log(Level.WARNING, "western host order cancelled");
+                }
+
+                @Override
+                public void onCompleted() {
+                    long seconds = NANOSECONDS.toSeconds(System.nanoTime() - startTime);
+                    responseObserver.onNext(BatchMeals.newBuilder().addAllMeals(orderedMeals).build());
+                    logger.info("elapsed time (s) was: " + seconds);
+                    responseObserver.onCompleted();
+                }
+            };
+        }
+
+        /**
+         * Receives a stream of {@link MealRequest}s, and responds with a stream of {@link BatchMeals} as they become
+         * immediately available to the patrons.
+         *
+         * @param responseObserver an observer to receive the stream of batch meals output from the kitchen.
+         * @return an observer to handle requested meal requests.
+         */
+        @Override
+        public StreamObserver<MealRequest> dimSumOrder(final StreamObserver<BatchMeals> responseObserver) {
+            return new StreamObserver<MealRequest>() {
+                @Override
+                public void onNext(MealRequest mealReq) {
+                    responseObserver.onNext(BatchMeals.newBuilder()
+                            .addAllMeals(
+                                    mealReq.getMealIdsList()
+                                            .parallelStream()
+                                            .filter(meals::containsKey)
+                                            .map(meals::get)
+                                            .peek(meal -> {
+                                                try {
+                                                    TimeUnit.MILLISECONDS.sleep(meal.getServingTime());
+                                                } catch (InterruptedException e) {
+                                                    e.printStackTrace();
+                                                }
+                                            })
+                                            .collect(Collectors.toList()))
+                            .build());
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    logger.log(Level.WARNING, "dimSumOrder cancelled");
+                }
+
+                @Override
+                public void onCompleted() {
+                    responseObserver.onCompleted();
+                }
+            };
+        }
+    }
 }

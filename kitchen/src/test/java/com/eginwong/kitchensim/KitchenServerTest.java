@@ -1,5 +1,6 @@
 package com.eginwong.kitchensim;
 
+import com.eginwong.kitchensim.Kitchen.BatchMeals;
 import com.eginwong.kitchensim.Kitchen.Meal;
 import com.eginwong.kitchensim.Kitchen.MealRequest;
 import com.eginwong.kitchensim.Kitchen.SingleOrder;
@@ -14,13 +15,18 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 
 @RunWith(JUnit4.class)
@@ -67,12 +73,14 @@ public class KitchenServerTest {
     public void waiterImpl_instantOrder() {
         WaiterGrpc.WaiterBlockingStub blockingStub = WaiterGrpc.newBlockingStub(inProcessChannel);
 
+        Meal m1 = Meal.newBuilder().setId(1)
+                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
+        mealsDatabase.put(m1.getId(), m1);
+
         // assert found and not found cases
+        Meal expected = mealsDatabase.get(1);
 
-        Meal expected = Meal.newBuilder().setId(1).addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
-
-        Meal actual =
-                blockingStub.staffOrder(SingleOrder.newBuilder().setMealId(1).build());
+        Meal actual = blockingStub.staffOrder(SingleOrder.newBuilder().setMealId(1).build());
 
         assertThat(expected, is(actual));
     }
@@ -120,5 +128,100 @@ public class KitchenServerTest {
 
         // verify
         assertEquals(mealsDatabase, result);
+    }
+
+    @Test
+    public void waiterImpl_westernHostOrder() {
+        Meal m1 = Meal.newBuilder().setId(1)
+                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
+        Meal m2 = Meal.newBuilder().setId(10)
+                .addIngredients("BEEF").setName("SUPERSTAR PHO").build();
+        Meal m3 = Meal.newBuilder().setId(12)
+                .addIngredients("CHICKEN").setName("PHOENIX CLAW").build();
+        mealsDatabase.put(m1.getId(), m1);
+        mealsDatabase.put(m2.getId(), m2);
+        mealsDatabase.put(m3.getId(), m3);
+
+        @SuppressWarnings("unchecked")
+        StreamObserver<BatchMeals> responseObserver =
+                (StreamObserver<BatchMeals>) mock(StreamObserver.class);
+        WaiterGrpc.WaiterStub stub = WaiterGrpc.newStub(inProcessChannel);
+        ArgumentCaptor<BatchMeals> batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
+
+        StreamObserver<SingleOrder> requestObserver = stub.westernHostOrder(responseObserver);
+
+        requestObserver.onNext(SingleOrder.newBuilder().setMealId(1).build());
+        requestObserver.onNext(SingleOrder.newBuilder().setMealId(10).build());
+        requestObserver.onNext(SingleOrder.newBuilder().setMealId(12).build());
+
+        verify(responseObserver, never()).onNext(any(BatchMeals.class));
+
+        requestObserver.onCompleted();
+
+        // allow some ms to let client receive the response. Similar usage later on.
+        verify(responseObserver, timeout(100)).onNext(batchMealsCaptor.capture());
+        BatchMeals summary = batchMealsCaptor.getValue();
+        assertEquals(3, summary.getMealsCount()); // 45 is the hard coded distance from p1 to p4.
+        verify(responseObserver, timeout(100)).onCompleted();
+        verify(responseObserver, never()).onError(any(Throwable.class));
+    }
+
+    @Test
+    public void waiterImpl_dimSumOrder() {
+        Meal m1 = Meal.newBuilder().setId(1)
+                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
+        Meal m2 = Meal.newBuilder().setId(10)
+                .addIngredients("BEEF").setName("SUPERSTAR PHO").build();
+        Meal m3 = Meal.newBuilder().setId(12)
+                .addIngredients("CHICKEN").setName("PHOENIX CLAW").build();
+        mealsDatabase.put(m1.getId(), m1);
+        mealsDatabase.put(m2.getId(), m2);
+        mealsDatabase.put(m3.getId(), m3);
+
+        MealRequest request1 = MealRequest.newBuilder()
+                .addAllMealIds(Arrays.asList(1, 10))
+                .build();
+        MealRequest request2 = MealRequest.newBuilder()
+                .addAllMealIds(Collections.singletonList(12))
+                .build();
+        MealRequest request3 = MealRequest.newBuilder()
+                .addAllMealIds(Arrays.asList(1, 10, 12))
+                .build();
+
+        @SuppressWarnings("unchecked")
+        StreamObserver<BatchMeals> responseObserver =
+                (StreamObserver<BatchMeals>) mock(StreamObserver.class);
+        WaiterGrpc.WaiterStub stub = WaiterGrpc.newStub(inProcessChannel);
+
+        StreamObserver<MealRequest> requestObserver = stub.dimSumOrder(responseObserver);
+        verify(responseObserver, never()).onNext(any(BatchMeals.class));
+
+        requestObserver.onNext(request1);
+        ArgumentCaptor<BatchMeals> batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
+        verify(responseObserver, timeout(100)).onNext(batchMealsCaptor.capture());
+        BatchMeals result = batchMealsCaptor.getValue();
+        assertEquals(2, result.getMealsList().size());
+        assertEquals(1, result.getMealsList().get(0).getId());
+        assertEquals(10, result.getMealsList().get(1).getId());
+
+        requestObserver.onNext(request2);
+        batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
+        verify(responseObserver, timeout(100).times(2)).onNext(batchMealsCaptor.capture());
+        result = batchMealsCaptor.getValue();
+        assertEquals(1, result.getMealsList().size());
+        assertEquals(12, result.getMealsList().get(0).getId());
+
+        requestObserver.onNext(request3);
+        batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
+        verify(responseObserver, timeout(100).times(3)).onNext(batchMealsCaptor.capture());
+        result = batchMealsCaptor.getValue();
+        assertEquals(3, result.getMealsList().size());
+        assertEquals(1, result.getMealsList().get(0).getId());
+        assertEquals(10, result.getMealsList().get(1).getId());
+        assertEquals(12, result.getMealsList().get(2).getId());
+
+        requestObserver.onCompleted();
+        verify(responseObserver, timeout(100)).onCompleted();
+        verify(responseObserver, never()).onError(any(Throwable.class));
     }
 }
