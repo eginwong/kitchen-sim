@@ -5,6 +5,7 @@ import com.eginwong.kitchensim.Kitchen.Meal;
 import com.eginwong.kitchensim.Kitchen.MealRequest;
 import com.eginwong.kitchensim.Kitchen.SingleOrder;
 import io.grpc.ManagedChannel;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -48,7 +49,7 @@ public class KitchenServerTest {
     public void setUp() throws Exception {
         // Generate a unique in-process server name.
         String serverName = InProcessServerBuilder.generateName();
-        mealsDatabase = new HashMap<>();
+        mealsDatabase = KitchenServerUtil.parseKitchenMeals(KitchenServerUtil.getDefaultMealsFile());
         // Use directExecutor for both InProcessServerBuilder and InProcessChannelBuilder can reduce the
         // usage timeouts and latches in test. But we still add timeout and latches where they would be
         // needed if no directExecutor were used, just for demo purpose.
@@ -65,23 +66,22 @@ public class KitchenServerTest {
         server.stop();
     }
 
+    @Test(expected = StatusRuntimeException.class)
+    public void waiterImpl_instantOrder_fake_order() {
+        WaiterGrpc.WaiterBlockingStub blockingStub = WaiterGrpc.newBlockingStub(inProcessChannel);
+        blockingStub.staffOrder(SingleOrder.newBuilder().setMealId(1000).build());
+    }
+
     /**
      * To test the server, make calls with a real stub using the in-process channel, and verify
      * behaviors or state changes from the client side.
      */
     @Test
-    public void waiterImpl_instantOrder() {
+    public void waiterImpl_instantOrder_real_order() {
         WaiterGrpc.WaiterBlockingStub blockingStub = WaiterGrpc.newBlockingStub(inProcessChannel);
 
-        Meal m1 = Meal.newBuilder().setId(1)
-                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
-        mealsDatabase.put(m1.getId(), m1);
-
-        // assert found and not found cases
         Meal expected = mealsDatabase.get(1);
-
         Meal actual = blockingStub.staffOrder(SingleOrder.newBuilder().setMealId(1).build());
-
         assertThat(expected, is(actual));
     }
 
@@ -91,15 +91,10 @@ public class KitchenServerTest {
         MealRequest request = MealRequest.newBuilder()
                 .addAllMealIds(Arrays.asList(1, 10, 12))
                 .build();
-        Meal m1 = Meal.newBuilder().setId(1)
-                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
-        Meal m2 = Meal.newBuilder().setId(10)
-                .addIngredients("BEEF").setName("SUPERSTAR PHO").build();
-        Meal m3 = Meal.newBuilder().setId(12)
-                .addIngredients("CHICKEN").setName("PHOENIX CLAW").build();
-        mealsDatabase.put(m1.getId(), m1);
-        mealsDatabase.put(m2.getId(), m2);
-        mealsDatabase.put(m3.getId(), m3);
+        Map<Integer, Meal> expected = new HashMap<>();
+        expected.put(1, mealsDatabase.get(1));
+        expected.put(10, mealsDatabase.get(10));
+        expected.put(12, mealsDatabase.get(12));
 
         final Map<Integer, Meal> result = new HashMap<>();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -127,20 +122,16 @@ public class KitchenServerTest {
         assertTrue(latch.await(1, TimeUnit.SECONDS));
 
         // verify
-        assertEquals(mealsDatabase, result);
+        assertEquals(expected, result);
     }
 
     @Test
     public void waiterImpl_westernHostOrder() {
-        Meal m1 = Meal.newBuilder().setId(1)
-                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
-        Meal m2 = Meal.newBuilder().setId(10)
-                .addIngredients("BEEF").setName("SUPERSTAR PHO").build();
-        Meal m3 = Meal.newBuilder().setId(12)
-                .addIngredients("CHICKEN").setName("PHOENIX CLAW").build();
-        mealsDatabase.put(m1.getId(), m1);
-        mealsDatabase.put(m2.getId(), m2);
-        mealsDatabase.put(m3.getId(), m3);
+        BatchMeals expected = BatchMeals.newBuilder()
+                .addMeals(mealsDatabase.get(1))
+                .addMeals(mealsDatabase.get(10))
+                .addMeals(mealsDatabase.get(12))
+                .build();
 
         @SuppressWarnings("unchecked")
         StreamObserver<BatchMeals> responseObserver =
@@ -153,30 +144,31 @@ public class KitchenServerTest {
         requestObserver.onNext(SingleOrder.newBuilder().setMealId(1).build());
         requestObserver.onNext(SingleOrder.newBuilder().setMealId(10).build());
         requestObserver.onNext(SingleOrder.newBuilder().setMealId(12).build());
-
         verify(responseObserver, never()).onNext(any(BatchMeals.class));
 
         requestObserver.onCompleted();
 
         // allow some ms to let client receive the response. Similar usage later on.
         verify(responseObserver, timeout(100)).onNext(batchMealsCaptor.capture());
-        BatchMeals summary = batchMealsCaptor.getValue();
-        assertEquals(3, summary.getMealsCount()); // 45 is the hard coded distance from p1 to p4.
+        assertEquals(expected, batchMealsCaptor.getValue());
         verify(responseObserver, timeout(100)).onCompleted();
         verify(responseObserver, never()).onError(any(Throwable.class));
     }
 
     @Test
     public void waiterImpl_dimSumOrder() {
-        Meal m1 = Meal.newBuilder().setId(1)
-                .addIngredients("CHIVES").setName("YEUNG CHOW CHOW FAN").build();
-        Meal m2 = Meal.newBuilder().setId(10)
-                .addIngredients("BEEF").setName("SUPERSTAR PHO").build();
-        Meal m3 = Meal.newBuilder().setId(12)
-                .addIngredients("CHICKEN").setName("PHOENIX CLAW").build();
-        mealsDatabase.put(m1.getId(), m1);
-        mealsDatabase.put(m2.getId(), m2);
-        mealsDatabase.put(m3.getId(), m3);
+        BatchMeals expected1 = BatchMeals.newBuilder()
+                .addMeals(mealsDatabase.get(1))
+                .addMeals(mealsDatabase.get(10))
+                .build();
+        BatchMeals expected2 = BatchMeals.newBuilder()
+                .addMeals(mealsDatabase.get(12))
+                .build();
+        BatchMeals expected3 = BatchMeals.newBuilder()
+                .addMeals(mealsDatabase.get(1))
+                .addMeals(mealsDatabase.get(10))
+                .addMeals(mealsDatabase.get(12))
+                .build();
 
         MealRequest request1 = MealRequest.newBuilder()
                 .addAllMealIds(Arrays.asList(1, 10))
@@ -199,26 +191,17 @@ public class KitchenServerTest {
         requestObserver.onNext(request1);
         ArgumentCaptor<BatchMeals> batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
         verify(responseObserver, timeout(100)).onNext(batchMealsCaptor.capture());
-        BatchMeals result = batchMealsCaptor.getValue();
-        assertEquals(2, result.getMealsList().size());
-        assertEquals(1, result.getMealsList().get(0).getId());
-        assertEquals(10, result.getMealsList().get(1).getId());
+        assertEquals(expected1, batchMealsCaptor.getValue());
 
         requestObserver.onNext(request2);
         batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
         verify(responseObserver, timeout(100).times(2)).onNext(batchMealsCaptor.capture());
-        result = batchMealsCaptor.getValue();
-        assertEquals(1, result.getMealsList().size());
-        assertEquals(12, result.getMealsList().get(0).getId());
+        assertEquals(expected2, batchMealsCaptor.getValue());
 
         requestObserver.onNext(request3);
         batchMealsCaptor = ArgumentCaptor.forClass(BatchMeals.class);
         verify(responseObserver, timeout(100).times(3)).onNext(batchMealsCaptor.capture());
-        result = batchMealsCaptor.getValue();
-        assertEquals(3, result.getMealsList().size());
-        assertEquals(1, result.getMealsList().get(0).getId());
-        assertEquals(10, result.getMealsList().get(1).getId());
-        assertEquals(12, result.getMealsList().get(2).getId());
+        assertEquals(expected3, batchMealsCaptor.getValue());
 
         requestObserver.onCompleted();
         verify(responseObserver, timeout(100)).onCompleted();

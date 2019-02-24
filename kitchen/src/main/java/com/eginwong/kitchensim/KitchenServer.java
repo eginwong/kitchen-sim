@@ -1,7 +1,5 @@
 package com.eginwong.kitchensim;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -19,7 +17,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import static com.eginwong.kitchensim.Kitchen.*;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * Server that manages startup/shutdown of a {@code KitchenServer} server.
@@ -68,7 +65,7 @@ public class KitchenServer {
     /**
      * Stop serving requests.
      */
-    public void stop() {
+    void stop() {
         if (server != null) {
             server.shutdown();
         }
@@ -112,7 +109,6 @@ public class KitchenServer {
          * @param responseObserver the observer that will receive the meal at the requested point.
          */
         public void staffOrder(SingleOrder req, StreamObserver<Meal> responseObserver) {
-            logger.info("RECEIVED STAFF ORDER REQUEST");
             if (meals.containsKey(req.getMealId())) {
                 Meal orderedMeal = meals.get(req.getMealId());
 
@@ -137,6 +133,7 @@ public class KitchenServer {
          */
         @Override
         public void easternHostOrder(MealRequest request, StreamObserver<Meal> responseObserver) {
+
             request.getMealIdsList().stream()
                     .filter(meals::containsKey)
                     .map(meals::get)
@@ -162,7 +159,6 @@ public class KitchenServer {
         public StreamObserver<SingleOrder> westernHostOrder(final StreamObserver<BatchMeals> responseObserver) {
             return new StreamObserver<SingleOrder>() {
                 List<Meal> orderedMeals = new ArrayList<>();
-                final long startTime = System.nanoTime();
 
                 @Override
                 public void onNext(SingleOrder order) {
@@ -184,9 +180,7 @@ public class KitchenServer {
 
                 @Override
                 public void onCompleted() {
-                    long seconds = NANOSECONDS.toSeconds(System.nanoTime() - startTime);
                     responseObserver.onNext(BatchMeals.newBuilder().addAllMeals(orderedMeals).build());
-                    logger.info("elapsed time (s) was: " + seconds);
                     responseObserver.onCompleted();
                 }
             };

@@ -1,7 +1,121 @@
 {
   "meals": [
-    { "ingredients": [ "CHIVES" ], "id": 1, "name": "YEUNG CHOW CHOW FAN", "servingTime": 3000 },
-    { "ingredients": [ "BEEF" ], "id": 10, "name": "SUPERSTAR PHO", "servingTime": 5000 },
-    { "ingredients": [ "CHICKEN" ], "id": 12, "name": "PHOENIX CLAW", "servingTime": 100 }
+    {
+      "ingredients": [
+        "CHIVES",
+        "SEAFOOD"
+      ],
+      "id": 1,
+      "name": "Seafood Cantonese Chow Mein",
+      "servingTime": 10000,
+      "price": 11.5
+    },
+    {
+      "ingredients": [
+        "TOFU",
+        "ONIONS"
+      ],
+      "id": 2,
+      "name": "Manchurian Tofu",
+      "servingTime": 5000,
+      "price": 8.25
+    },
+    {
+      "ingredients": [
+        "TOFU",
+        "GARLIC"
+      ],
+      "id": 3,
+      "name": "Garlic Tofu",
+      "servingTime": 2000,
+      "price": 8.25
+    },
+    {
+      "ingredients": [
+        "BEEF",
+        "GREEN PEPPER"
+      ],
+      "id": 4,
+      "name": "Beef with Green Pepper",
+      "servingTime": 7000,
+      "price": 8.75
+    },
+    {
+      "ingredients": [
+        "BEEF",
+        "SNOW PEA"
+      ],
+      "id": 5,
+      "name": "Beef with Snow Pea",
+      "servingTime": 7000,
+      "price": 10.25
+    },
+    {
+      "ingredients": [
+        "CHICKEN",
+        "BLACK BEAN SAUCE"
+      ],
+      "id": 6,
+      "name": "Chicken with Black Bean Sauce",
+      "servingTime": 9000,
+      "price": 9
+    },
+    {
+      "ingredients": [
+        "SHRIMP",
+        "TOMATO SAUCE"
+      ],
+      "id": 7,
+      "name": "Shrimp Sweet & Sour",
+      "servingTime": 4000,
+      "price": 10.99
+    },
+    {
+      "ingredients": [
+        "SHRIMP"
+      ],
+      "id": 8,
+      "name": "Deep Fried Crispy Shrimp",
+      "servingTime": 11000,
+      "price": 13
+    },
+    {
+      "ingredients": [
+        "RICE"
+      ],
+      "id": 9,
+      "name": "Steam Rice",
+      "servingTime": 300,
+      "price": 2
+    },
+    {
+      "ingredients": [
+        "SQUID"
+      ],
+      "id": 10,
+      "name": "Fried Squid",
+      "servingTime": 5000,
+      "price": 9
+    },
+    {
+      "ingredients": [
+        "EGG",
+        "BEEF",
+        "CARROTS",
+        "ONIONS"
+      ],
+      "id": 11,
+      "name": "Egg Fried Rice with Curry Beef",
+      "servingTime": 8500,
+      "price": 8.5
+    },
+    {
+      "ingredients": [
+        "CHICKEN"
+      ],
+      "id": 12,
+      "name": "Phoenix Claw",
+      "servingTime": 100
+    }
   ]
 }
