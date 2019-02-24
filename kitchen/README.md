@@ -4,6 +4,13 @@ Kitchen - gRPC Server in Java
 PREREQUISITES
 -------------
 
+GETTING STARTED
+---------------
+In your terminal:
+```sh
+./gradlew run
+```
+
 
 OBJECTIVE
 ---------
@@ -15,4 +22,3 @@ OBJECTIVE
   - server-side streaming to client-point
   - client and server-side streaming  
 3. Include testing
-
