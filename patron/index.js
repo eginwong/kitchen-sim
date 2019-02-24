@@ -1,3 +1,6 @@
+const inquirer = require('inquirer');
+
+/** gRPC client imports */
 const logger = require('./logger');
 const async = require('async');
 const _ = require('lodash');
@@ -22,31 +25,32 @@ const client = new kitchen_sim_proto.Waiter('127.0.0.1:50051',
 // ==============================
 
 function staff(id, callback) {
-  client.staffOrder({ mealId: id }, (e, meal) => { logger.logSingleMeal(meal) });
-  callback();
+  console.log('SENDING SINGLE ORDER!\n');
+  client.staffOrder({ mealId: id }, (e, meal) => {
+    errorHandler(e);
+    logger.logSingleMeal(meal);
+    callback();
+  });
 }
 
 function easternHostOrder(callback) {
-  console.log('Ordering meals #1, #10, #12');
-  const call = client.easternHostOrder({ mealIds: [1, 10, 12] });
-
+  console.log('SENDING MEAL REQUEST!\n');
+  const call = client.easternHostOrder({ mealIds: [getRandomFood(), getRandomFood(), getRandomFood()] });
   call.on('data', (meal) => logger.logSingleMeal(meal));
+  call.on('error', errorHandler);
   call.on('end', callback);
 }
 
 function westernHostOrder(callback) {
-  const call = client.westernHostOrder((error, batchMeal) => {
-    if (error) {
-      callback(error);
-      return;
-    }
+  const call = client.westernHostOrder((e, batchMeal) => {
+    errorHandler(e);
     logger.logBatchMeal(batchMeal);
     callback();
   });
 
   function foodSender(mealId) {
     return function (callback) {
-      console.log("SENDING MEAL");
+      console.log('SENDING SINGLE ORDER #' + mealId + '!\n');
       call.write({
         mealId
       });
@@ -54,7 +58,7 @@ function westernHostOrder(callback) {
     }
   }
 
-  const asyncRequests = [1, 10, 12].map(order => foodSender(order));
+  const asyncRequests = [getRandomFood(), getRandomFood(), getRandomFood()].map(order => foodSender(order));
   async.series(asyncRequests, () => call.end());
 }
 
@@ -63,43 +67,68 @@ function dimSumOrder(callback) {
   call.on('data', function (batchMeal) {
     logger.logBatchMeal(batchMeal);
   });
-
+  call.on('error', errorHandler);
   call.on('end', callback);
 
   function foodSender(mealIds) {
     return function (callback) {
-      console.log('Sending mealRequest with following combos: ' + mealIds);
+      console.log('SENDING MEALREQUEST WITH FOLLOWING COMBOS: ' + mealIds + '\n');
       call.write({
         mealIds
       });
-      _.delay(callback, _.random(500, 3000));
+      _.delay(callback, _.random(500, 4000));
     }
   }
 
   const mealRequests = [
-    { mealIds: [12] },
-    { mealIds: [1, 12] },
-    { mealIds: [10, 12] },
-    { mealIds: [1, 10, 12] }
+    { mealIds: [getRandomFood()] },
+    { mealIds: [getRandomFood(), getRandomFood()] },
+    { mealIds: [getRandomFood(), getRandomFood()] },
+    { mealIds: [getRandomFood(), getRandomFood(), getRandomFood()] }
   ];
-
   const asyncRequests = mealRequests.map(mealRequest => foodSender(mealRequest.mealIds));
 
   async.series(asyncRequests, () => call.end());
 }
 
-// CLI piece
-const processName = process.argv.shift();
-const scriptName = process.argv.shift();
-const command = process.argv.shift();
-
-logger.logInitiation(command);
-if (command == 'staff') {
-  staff(process.argv.shift(), () => logger.logCompletion(command));
-} else if (command == 'western') {
-  westernHostOrder(() => logger.logCompletion(command));
-} else if (command == 'eastern') {
-  easternHostOrder(() => logger.logCompletion(command));
-} else if (command == 'dimsum') {
-  dimSumOrder(() => logger.logCompletion(command));
+function getRandomFood() {
+  return _.random(1, 12);
 }
+
+function errorHandler(e) {
+  if (e) {
+    console.error('Error encountered. Please make sure Java gRPC server is running correctly.\n')
+    process.exit(1);
+  }
+}
+
+/** DEMO SECTION */
+inquirer
+  .prompt([
+    {
+      type: 'list',
+      name: 'option',
+      message: 'Which demo would you like to see?',
+      choices: [
+        { name: 'Unary: direct order to kitchen', value: 'unary' },
+        { name: 'Client-side streaming: several orders and served all at once', value: 'css' },
+        { name: 'Server-side streaming: single batch order and served immediately', value: 'sss' },
+        { name: 'Client/Server-side streaming: several orders and served whenever ready', value: 'csss' },
+        new inquirer.Separator(),
+      ]
+    },
+  ])
+  .then(choice => {
+    const option = choice.option;
+    logger.logInitiation();
+
+    if (option == 'unary') {
+      staff(10, logger.logCompletion);
+    } else if (option == 'css') {
+      westernHostOrder(logger.logCompletion);
+    } else if (option == 'sss') {
+      easternHostOrder(logger.logCompletion);
+    } else if (option == 'csss') {
+      dimSumOrder(logger.logCompletion);
+    }
+  });

@@ -6,6 +6,16 @@ PREREQUISITES
 
 - `node`: This requires Node 0.12.x or greater.
 
+GETTING STARTED
+---------------
+For the demo, make sure the Java server is running in kitchen.
+In your terminal:
+```sh
+npm i
+cd patron
+node patron/index.js
+```
+
 OBJECTIVE
 ---------
 

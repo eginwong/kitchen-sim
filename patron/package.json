@@ -13,6 +13,7 @@
     "async": "^2.6.2",
     "google-protobuf": "^3.7.0-rc.2",
     "grpc": "^1.18.0",
+    "inquirer": "^6.2.2",
     "lodash": "^4.17.11"
   }
 }

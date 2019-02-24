@@ -38,6 +38,7 @@ message Meal {
   string name = 2; 
   repeated string ingredients = 3;
   int32 servingTime = 4;
+  double price = 5;
 }
 
 // Not used in RPC, but for bootstrapping purposes
