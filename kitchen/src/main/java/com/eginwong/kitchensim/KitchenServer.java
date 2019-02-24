@@ -122,13 +122,6 @@ public class KitchenServer {
                     e.printStackTrace();
                 }
                 responseObserver.onNext(orderedMeal);
-
-                try {
-                    logger.info(JsonFormat.printer().print(req));
-                    logger.info("SERVED BY: " + JsonFormat.printer().print(orderedMeal));
-                } catch (InvalidProtocolBufferException e) {
-                    e.printStackTrace();
-                }
             } else {
                 responseObserver.onError(new StatusRuntimeException(Status.NOT_FOUND));
             }
