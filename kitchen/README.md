@@ -3,6 +3,8 @@ Kitchen - gRPC Server in Java
 
 PREREQUISITES
 -------------
+- `Gradle`
+- `Java`
 
 GETTING STARTED
 ---------------
