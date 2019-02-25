@@ -113,7 +113,7 @@ inquirer
         { name: 'Unary: direct order to kitchen', value: 'unary' },
         { name: 'Client-side streaming: several orders and served all at once', value: 'css' },
         { name: 'Server-side streaming: single batch order and served immediately', value: 'sss' },
-        { name: 'Client/Server-side streaming: several orders and served whenever ready', value: 'csss' },
+        { name: 'Bidirectional streaming: several orders and served whenever ready', value: 'bidi' },
         new inquirer.Separator(),
       ]
     },
@@ -128,7 +128,7 @@ inquirer
       westernHostOrder(logger.logCompletion);
     } else if (option == 'sss') {
       easternHostOrder(logger.logCompletion);
-    } else if (option == 'csss') {
+    } else if (option == 'bidi') {
       dimSumOrder(logger.logCompletion);
     }
   });
